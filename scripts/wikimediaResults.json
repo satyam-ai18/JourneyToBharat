@@ -1,0 +1,82 @@
+{
+  "badrinath_temple": {
+    "id": "badrinath_temple",
+    "fileName": "File:Badrinath_temple_DSCN9998.jpg",
+    "localPath": "/images/destinations/badrinath_temple.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Badrinath_temple_DSCN9998.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Sumita_Roy_Dutta\" title=\"User:Sumita Roy Dutta\">Sumita Roy Dutta</a>",
+    "license": "CC BY-SA 4.0"
+  },
+  "gangotri_dham": {
+    "id": "gangotri_dham",
+    "fileName": "File:Gangotri_temple.jpg",
+    "localPath": "/images/destinations/gangotri_dham.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/0/04/Gangotri_temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Atarax42\" title=\"User:Atarax42\">Atarax42</a>",
+    "license": "CC BY-SA 3.0"
+  },
+  "yamunotri_dham": {
+    "id": "yamunotri_dham",
+    "fileName": "File:Yamunotri_temple_and_ashram.jpg",
+    "localPath": "/images/destinations/yamunotri_dham.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/8/88/Yamunotri_temple_and_ashram.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Atarax42\" title=\"User:Atarax42\">Atarax42</a>",
+    "license": "CC BY-SA 3.0"
+  },
+  "vaishno_devi": {
+    "id": "vaishno_devi",
+    "fileName": "File:Vaishno_Devi_Bhawan.jpg",
+    "localPath": "/images/destinations/vaishno_devi.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Vaishno_Devi_Bhawan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"https://en.wikipedia.org/wiki/User:Raulcaeser\" class=\"extiw\" title=\"en:User:Raulcaeser\">Raulcaeser</a>",
+    "license": "CC BY-SA 3.0"
+  },
+  "jagannath_puri": {
+    "id": "jagannath_puri",
+    "fileName": "File:Jagannath_Temple_-_Right_View.jpg",
+    "localPath": "/images/destinations/jagannath_puri.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/5/52/Jagannath_Temple_-_Right_View.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Amitbalani&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Amitbalani (page does not exist)\">Amitbalani</a>",
+    "license": "CC0"
+  },
+  "somnath_temple": {
+    "id": "somnath_temple",
+    "fileName": "File:Somanath_mandir_(cropped).jpg",
+    "localPath": "/images/destinations/somnath_temple.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/1/10/Somanath_mandir_%28cropped%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:B._SurajPatro1997&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:B. SurajPatro1997 (page does not exist)\">B. SurajPatro1997</a>",
+    "license": "CC BY-SA 4.0"
+  },
+  "tirupati_balaji": {
+    "id": "tirupati_balaji",
+    "fileName": "File:A_View_of_Tirumala_Venkateswara_Temple.JPG",
+    "localPath": "/images/destinations/tirupati_balaji.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2a/A_View_of_Tirumala_Venkateswara_Temple.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Adityamadhav83\" title=\"User:Adityamadhav83\">Adityamadhav83</a>",
+    "license": "CC BY-SA 3.0"
+  },
+  "kamakhya_devi": {
+    "id": "kamakhya_devi",
+    "fileName": "File:Kamakhya_Temple,_Guwahati.jpg",
+    "localPath": "/images/destinations/kamakhya_devi.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Kamakhya_Temple%2C_Guwahati.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Kunaldalui\" title=\"User:Kunaldalui\">Kunal Dalui</a>",
+    "license": "CC BY-SA 3.0"
+  },
+  "mahakaleshwar_ujjain": {
+    "id": "mahakaleshwar_ujjain",
+    "fileName": "File:Mahakaleshwar_Temple,_Ujjain.jpg",
+    "localPath": "/images/destinations/mahakaleshwar_ujjain.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/7/75/Mahakaleshwar_Temple%2C_Ujjain.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Ashverse&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Ashverse (page does not exist)\">Ashverse</a>",
+    "license": "CC BY-SA 4.0"
+  },
+  "hampi_virupaksha": {
+    "id": "hampi_virupaksha",
+    "fileName": "File:Virupaksha_temple_hampi.jpg",
+    "localPath": "/images/destinations/hampi_virupaksha.org&utm_campaign=imageinfo&utm_content=original",
+    "wikimediaUrl": "https://upload.wikimedia.org/wikipedia/commons/6/66/Virupaksha_temple_hampi.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "artist": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Nlgirish&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Nlgirish (page does not exist)\">Nlgirish</a>",
+    "license": "CC BY-SA 4.0"
+  }
+}
