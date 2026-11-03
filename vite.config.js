@@ -47,9 +47,24 @@ function ttsProxyPlugin() {
   };
 }
 
+function ghPagesImagePlugin() {
+  return {
+    name: 'gh-pages-image-plugin',
+    transform(code, id) {
+      if (process.env.NODE_ENV === 'production' && !id.includes('node_modules')) {
+        return {
+          code: code.replace(/(['"])\/images\//g, '$1/JourneyToBharat/images/'),
+          map: null
+        };
+      }
+    }
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), ttsProxyPlugin()],
+  base: process.env.NODE_ENV === 'production' ? '/JourneyToBharat/' : '/',
+  plugins: [react(), ttsProxyPlugin(), ghPagesImagePlugin()],
   server: {
     host: '0.0.0.0',
     port: 5173,

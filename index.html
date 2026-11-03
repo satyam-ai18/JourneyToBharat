@@ -2,10 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/images/journey_to_bharat_emblem.png" />
+    <link rel="icon" type="image/png" href="./images/journey_to_bharat_emblem.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Journey to Bharat | Discover. Explore. Experience.</title>
     <meta name="description" content="Explore India's divine temples, 12 Jyotirlingas, 51 Shaktipeeths, Char Dham, Himalayan peaks, serene lakes, waterfalls, and cultural heritage across all states and UTs." />
+    <script>
+      // Automatically route root /images/ requests to /JourneyToBharat/images/ on GitHub Pages
+      if (window.location.pathname.startsWith('/JourneyToBharat')) {
+        window.addEventListener('error', function (e) {
+          if (e.target && e.target.tagName === 'IMG') {
+            var raw = e.target.getAttribute('src');
+            if (raw && raw.indexOf('images/') !== -1 && !raw.startsWith('/JourneyToBharat/')) {
+              e.target.src = '/JourneyToBharat/' + raw.replace(/^\.?\/?/, '');
+            }
+          }
+        }, true);
+      }
+    </script>
     <!-- Google Fonts: Editorial Serif (Cinzel, Playfair Display) & Modern Sans (Plus Jakarta Sans, Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

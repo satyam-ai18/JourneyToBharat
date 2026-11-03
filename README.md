@@ -1,4 +1,12 @@
-# Bharat Pilgrimage & Tourism Master Atlas: Complete Pan-India Geospatial System
+# Journey to Bharat (भारत यात्रा) 🚩
+### Pan-India Sacred Pilgrimage & Smart Travel Companion
+
+[![Live Website](https://img.shields.io/badge/Live%20Website-satyam--ai18.github.io%2FJourneyToBharat-brightgreen?style=for-the-badge&logo=github)](https://satyam-ai18.github.io/JourneyToBharat/)
+[![Deploy to GitHub Pages](https://github.com/satyam-ai18/JourneyToBharat/actions/workflows/deploy.yml/badge.svg)](https://github.com/satyam-ai18/JourneyToBharat/actions/workflows/deploy.yml)
+
+🌐 **Live Website Link**: [https://satyam-ai18.github.io/JourneyToBharat/](https://satyam-ai18.github.io/JourneyToBharat/)
+
+---
 
 > **A Unified Interactive Geospatial Travel Map, Distance Matrix & Transit Atlas** covering **North, Central, West, and South India**: Uttar Pradesh, Madhya Pradesh, Maharashtra, Rajasthan, Tamil Nadu, Kerala, Karnataka, Andhra Pradesh, and Puducherry.
 > 
