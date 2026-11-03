@@ -202,26 +202,80 @@ function transliterateForNonHindiVoice(text) {
 }
 
 /**
- * Split text into natural, crisp speaking sentences (punctuations preserved)
+ * Split text into safe, bite-sized clause chunks (max 75 characters)
+ * Android Chrome has a hard buffer / ~15-second cutoff per SpeechSynthesisUtterance.
+ * Keeping chunks <= 75 chars (~3 to 4 seconds each) completely eliminates Android midway cutoff bugs.
  */
-function splitIntoSentences(text) {
+function splitIntoSafeChunks(text, maxLen = 75) {
   if (!text || typeof text !== "string") return [];
-  const parts = text.match(/[^.!?।\n]+[.!?।\n]+|[^.!?।\n]+$/g) || [text];
-  return parts.map((s) => s.trim()).filter(Boolean);
+  const rawParts = text.match(/[^।!?,.;:\n]+[।!?,.;:\n]+|[^।!?,.;:\n]+$/g) || [text];
+  const chunks = [];
+  let current = "";
+
+  for (const part of rawParts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    if (!current) {
+      if (trimmed.length <= maxLen) {
+        current = trimmed;
+      } else {
+        const words = trimmed.split(/\s+/);
+        let sub = "";
+        for (const w of words) {
+          if (!sub) {
+            sub = w;
+          } else if ((sub + " " + w).length <= maxLen) {
+            sub += " " + w;
+          } else {
+            chunks.push(sub);
+            sub = w;
+          }
+        }
+        if (sub) current = sub;
+      }
+    } else {
+      if ((current + " " + trimmed).length <= maxLen) {
+        current += " " + trimmed;
+      } else {
+        chunks.push(current);
+        if (trimmed.length <= maxLen) {
+          current = trimmed;
+        } else {
+          const words = trimmed.split(/\s+/);
+          let sub = "";
+          for (const w of words) {
+            if (!sub) {
+              sub = w;
+            } else if ((sub + " " + w).length <= maxLen) {
+              sub += " " + w;
+            } else {
+              chunks.push(sub);
+              sub = w;
+            }
+          }
+          current = sub;
+        }
+      }
+    }
+  }
+
+  if (current) chunks.push(current);
+  return chunks.filter(Boolean);
 }
 
 // Detect mobile device
 const isMobileDevice = typeof navigator !== "undefined" && 
   /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-// Active utterance pool to prevent V8 garbage collection on mobile & desktop
+// Active utterance pool to prevent V8 garbage collection sweeps on mobile & desktop
 if (typeof window !== "undefined") {
   window.__activeUtterancePool = new Set();
 }
 
 /**
  * Mobile-Safe & Desktop-Safe High-Definition Web Speech Narrator
- * Guaranteed continuous playback with zero mid-sentence cutoffs on Android/iOS/Desktop.
+ * Uses sequential clause chaining with watchdog timer to guarantee continuous full playback.
  */
 async function speakNativeWebSpeechSequence(text, options = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -232,7 +286,13 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
   stopSpeech();
   const sessionId = ++currentSpeechSession;
 
+  // Tiny 50ms pause gives Chromium internal audio queue time to flush cancel()
+  await new Promise((r) => setTimeout(r, 50));
+  if (sessionId !== currentSpeechSession) return;
+
   const voices = await getReadyVoices();
+  if (sessionId !== currentSpeechSession) return;
+
   const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
   const voice = pickBestVoice(voices, options.lang || (isHindi ? "hi-IN" : "en-IN"), text);
 
@@ -243,11 +303,8 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
 
   const cleanText = isNonHindiVoice ? transliterateForNonHindiVoice(text) : text;
 
-  // On mobile or for texts up to 450 chars: speak as ONE seamless natural utterance.
-  // This keeps the user activation alive and prevents mobile autoplay/pause bugs.
-  const chunks = (isMobileDevice || cleanText.length <= 450)
-    ? [cleanText]
-    : splitIntoSentences(cleanText);
+  // Split into short, natural clauses under 75 characters
+  const chunks = splitIntoSafeChunks(cleanText, 75);
 
   if (chunks.length === 0) {
     if (options.onEnd) options.onEnd();
@@ -260,68 +317,75 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
 
   if (options.onStart) options.onStart();
 
-  if (typeof window !== "undefined" && window.__activeUtterancePool) {
-    window.__activeUtterancePool.clear();
+  for (let i = 0; i < chunks.length; i++) {
+    if (sessionId !== currentSpeechSession) return;
+    const chunkText = chunks[i];
+
+    await new Promise((resolve) => {
+      if (sessionId !== currentSpeechSession) {
+        resolve();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(chunkText);
+
+      // Retain in window & Set to prevent V8 garbage collection mid-speech
+      window.__activeUtterance = utterance;
+      if (typeof window !== "undefined" && window.__activeUtterancePool) {
+        window.__activeUtterancePool.add(utterance);
+      }
+
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang || (isHindi ? "hi-IN" : "en-IN");
+      } else {
+        utterance.lang = isHindi ? "hi-IN" : "en-IN";
+      }
+
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+      utterance.volume = volume;
+
+      let settled = false;
+      let watchdogTimer = null;
+
+      const finishChunk = () => {
+        if (settled) return;
+        settled = true;
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
+        if (typeof window !== "undefined" && window.__activeUtterancePool) {
+          window.__activeUtterancePool.delete(utterance);
+        }
+        resolve();
+      };
+
+      utterance.onend = finishChunk;
+      utterance.onerror = (err) => {
+        console.warn("[WebSpeech] Chunk event:", err?.error || err);
+        finishChunk();
+      };
+
+      // Watchdog fallback: If Android Chrome misses onend or audio stalls,
+      // force advance so the queue NEVER freezes!
+      const timeoutMs = Math.max(5000, Math.ceil(chunkText.length * 130));
+      watchdogTimer = setTimeout(finishChunk, timeoutMs);
+
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("[WebSpeech] speak failed:", e);
+        finishChunk();
+      }
+    });
   }
 
-  let completedChunks = 0;
-
-  chunks.forEach((chunkText) => {
-    const utterance = new SpeechSynthesisUtterance(chunkText);
-    
-    // Retain in global Set to prevent V8 garbage collection
-    if (typeof window !== "undefined" && window.__activeUtterancePool) {
-      window.__activeUtterancePool.add(utterance);
-    }
-    window.__activeUtterance = utterance;
-
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang || (isHindi ? "hi-IN" : "en-IN");
-    } else {
-      utterance.lang = isHindi ? "hi-IN" : "en-IN";
-    }
-
-    utterance.rate = rate;
-    utterance.pitch = pitch;
-    utterance.volume = volume;
-
-    utterance.onend = () => {
-      if (typeof window !== "undefined" && window.__activeUtterancePool) {
-        window.__activeUtterancePool.delete(utterance);
-      }
-      if (sessionId !== currentSpeechSession) return;
-      completedChunks++;
-      if (completedChunks >= chunks.length) {
-        window.__activeUtterance = null;
-        if (options.onEnd) options.onEnd();
-      }
-    };
-
-    utterance.onerror = (err) => {
-      console.warn("[WebSpeech] Utterance event:", err);
-      if (typeof window !== "undefined" && window.__activeUtterancePool) {
-        window.__activeUtterancePool.delete(utterance);
-      }
-      if (sessionId !== currentSpeechSession) return;
-      completedChunks++;
-      if (completedChunks >= chunks.length) {
-        window.__activeUtterance = null;
-        if (options.onEnd) options.onEnd();
-      }
-    };
-
-    try {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-      // Enqueue synchronously under user gesture context
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn("[WebSpeech] Speak failed:", e);
-      if (options.onError) options.onError(e);
-    }
-  });
+  if (sessionId === currentSpeechSession) {
+    window.__activeUtterance = null;
+    if (options.onEnd) options.onEnd();
+  }
 }
 
 /**
@@ -423,6 +487,11 @@ export function pauseSpeech() {
   }
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     try {
+      // Android Chrome treats pause() as cancel(), so mobile stops cleanly
+      if (isMobileDevice) {
+        stopSpeech();
+        return false;
+      }
       if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
         window.speechSynthesis.pause();
         return true;

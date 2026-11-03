@@ -357,7 +357,12 @@ export default function AiScreenNarrator({
   // Pause speech
   const handlePauseSpeech = () => {
     const ok = pauseSpeech();
-    if (ok) setIsPaused(true);
+    if (ok) {
+      setIsPaused(true);
+    } else {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    }
   };
 
   // Resume speech
