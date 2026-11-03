@@ -262,7 +262,7 @@ export default function AiScreenNarrator({
   const [isPaused, setIsPaused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState("hi-IN"); // hi-IN (Hinglish) | en-IN
-  const [speechRate] = useState(1.03); // Crisp, clear conversational speed
+  const [speechRate, setSpeechRate] = useState(1.15); // Fast but natural & normal fast conversational tempo (1.15x)
   const [isLocalVoiceEngine, setIsLocalVoiceEngine] = useState(false);
   const [isOpenJarvisActive, setIsOpenJarvisActive] = useState(false);
   const [currentActionNotice, setCurrentActionNotice] = useState(null);
@@ -1261,6 +1261,22 @@ export default function AiScreenNarrator({
                   }}
                 >
                   English
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpeechRate((r) => (r === 1.15 ? 1.25 : r === 1.25 ? 1.0 : 1.15))}
+                  title="वॉइस गति बदलें (Voice Speed: 1x, 1.15x तेज़, 1.25x)"
+                  style={{
+                    background: "rgba(245, 158, 11, 0.2)",
+                    color: "#fef3c7",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                    borderRadius: "4px",
+                    padding: "2px 7px",
+                    fontWeight: "700",
+                    cursor: "pointer"
+                  }}
+                >
+                  ⚡ {speechRate}x {speechRate >= 1.15 ? "(तेज़)" : "(सामान्य)"}
                 </button>
               </div>
 

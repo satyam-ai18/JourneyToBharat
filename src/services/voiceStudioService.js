@@ -22,10 +22,15 @@ let hasCheckedBackend = false;
  * Check if local VoiceStudio desktop service is active
  */
 export async function checkVoiceStudioHealth() {
+  if (typeof window === "undefined" || (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1")) {
+    isVoiceStudioAvailable = false;
+    hasCheckedBackend = true;
+    return false;
+  }
   if (hasCheckedBackend) return isVoiceStudioAvailable;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 600);
+    const timer = setTimeout(() => controller.abort(), 500);
     const res = await fetch(`${VOICE_STUDIO_HOST}/health`, {
       signal: controller.signal,
       headers: { Accept: "application/json" }
@@ -40,165 +45,284 @@ export async function checkVoiceStudioHealth() {
   return isVoiceStudioAvailable;
 }
 
-/**
- * Split narrative into natural 140-160 char chunks for smooth audio buffering
- */
-function splitTextIntoChunks(text, maxLen = 150) {
-  if (!text || text.length <= maxLen) return [text || ""];
-  const sentences = text.match(/[^.!?।\n]+[.!?।\n]+|[^.!?।\n]+$/g) || [text];
-  const chunks = [];
-  let current = "";
+// Cached Voices Management
+let cachedVoices = [];
 
-  for (const s of sentences) {
-    const trimmed = s.trim();
-    if (!trimmed) continue;
-    if ((current + " " + trimmed).trim().length <= maxLen) {
-      current = (current + " " + trimmed).trim();
-    } else {
-      if (current) chunks.push(current);
-      if (trimmed.length > maxLen) {
-        const words = trimmed.split(" ");
-        let sub = "";
-        for (const w of words) {
-          if ((sub + " " + w).trim().length <= maxLen) {
-            sub = (sub + " " + w).trim();
-          } else {
-            if (sub) chunks.push(sub);
-            sub = w;
-          }
-        }
-        if (sub) current = sub;
-        else current = "";
-      } else {
-        current = trimmed;
-      }
+function updateVoices() {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    const list = window.speechSynthesis.getVoices();
+    if (list && list.length > 0) {
+      cachedVoices = list;
     }
   }
-  if (current) chunks.push(current);
-  return chunks.filter(Boolean);
+}
+
+if (typeof window !== "undefined" && "speechSynthesis" in window) {
+  updateVoices();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = updateVoices;
+  }
+}
+
+async function getReadyVoices() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
+  if (cachedVoices && cachedVoices.length > 0) return cachedVoices;
+  updateVoices();
+  if (cachedVoices.length > 0) return cachedVoices;
+
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        updateVoices();
+        resolve(cachedVoices);
+      }
+    }, 250);
+
+    const handler = () => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        updateVoices();
+        resolve(cachedVoices);
+      }
+    };
+    try {
+      window.speechSynthesis.addEventListener("voiceschanged", handler, { once: true });
+    } catch {
+      window.speechSynthesis.onvoiceschanged = handler;
+    }
+  });
 }
 
 /**
- * Browser Native Web Speech fallback (offline or fallback)
+ * Pick highest quality voice: Natural/Neural Hindi for Edge/Chrome,
+ * or Indian English if no Hindi voice is installed.
  */
-function speakNativeWebSpeech(text, options = {}) {
+function pickBestVoice(voices, lang = "hi-IN", text = "") {
+  if (!voices || voices.length === 0) return null;
+  const isHindi = (lang && lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
+
+  if (isHindi) {
+    // 1. Natural / Neural Hindi voices (Edge Microsoft Swara/Madhur/Hemant, Chrome Google हिन्दी)
+    const naturalHindi = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      const isHi = vLang.startsWith("hi") || vName.includes("hindi") || (v.name && v.name.includes("हिन्दी"));
+      return isHi && (vName.includes("natural") || vName.includes("online") || vName.includes("neural") || vName.includes("swara") || vName.includes("madhur") || vName.includes("google"));
+    });
+    if (naturalHindi) return naturalHindi;
+
+    // 2. Any Hindi voice (Kalpana, Android hi-in, iOS Lekha)
+    const anyHindi = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      return vLang.startsWith("hi") || vLang.includes("hi-in") || vName.includes("hindi") || (v.name && v.name.includes("हिन्दी"));
+    });
+    if (anyHindi) return anyHindi;
+
+    // 3. Natural Indian English (Neerja, Prabhat, Google Indian English)
+    const naturalIndianEn = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      return (vLang.includes("en-in") || vName.includes("india")) && (vName.includes("natural") || vName.includes("online") || vName.includes("neerja") || vName.includes("prabhat") || vName.includes("google"));
+    });
+    if (naturalIndianEn) return naturalIndianEn;
+
+    // 4. Any Indian English
+    const anyIndianEn = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      return vLang.includes("en-in") || vName.includes("india");
+    });
+    if (anyIndianEn) return anyIndianEn;
+
+    // 5. Natural English
+    const naturalEn = voices.find((v) => (v.name || "").toLowerCase().includes("natural") || (v.name || "").toLowerCase().includes("online"));
+    if (naturalEn) return naturalEn;
+
+    return voices[0];
+  } else {
+    // English target: prefer Indian English Natural
+    const naturalIndianEn = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      return (vLang.includes("en-in") || vName.includes("india")) && (vName.includes("natural") || vName.includes("online") || vName.includes("neerja") || vName.includes("prabhat") || vName.includes("google"));
+    });
+    if (naturalIndianEn) return naturalIndianEn;
+
+    const anyIndianEn = voices.find((v) => {
+      const vLang = (v.lang || "").toLowerCase();
+      const vName = (v.name || "").toLowerCase();
+      return vLang.includes("en-in") || vName.includes("india");
+    });
+    if (anyIndianEn) return anyIndianEn;
+
+    const naturalEn = voices.find((v) => (v.name || "").toLowerCase().includes("natural") || (v.name || "").toLowerCase().includes("online"));
+    if (naturalEn) return naturalEn;
+
+    return voices[0];
+  }
+}
+
+// Phonetic fallback mapping if OS has zero Hindi voices installed
+const DEVA_MAP = {
+  '\u0905':'a','\u0906':'aa','\u0907':'i','\u0908':'ee','\u0909':'u','\u090A':'oo','\u090B':'ri',
+  '\u090F':'e','\u0910':'ai','\u0913':'o','\u0914':'au',
+  '\u0915':'k','\u0916':'kh','\u0917':'g','\u0918':'gh','\u0919':'ng',
+  '\u091A':'ch','\u091B':'chh','\u091C':'j','\u091D':'jh','\u091E':'ny',
+  '\u091F':'t','\u0920':'th','\u0921':'d','\u0922':'dh','\u0923':'n',
+  '\u0924':'t','\u0925':'th','\u0926':'d','\u0927':'dh','\u0928':'n',
+  '\u092A':'p','\u092B':'ph','\u092C':'b','\u092D':'bh','\u092E':'m',
+  '\u092F':'y','\u0930':'r','\u0932':'l','\u0935':'v','\u0936':'sh','\u0937':'sh','\u0938':'s','\u0939':'h',
+  '\u093E':'aa','\u093F':'i','\u0940':'ee','\u0941':'u','\u0942':'oo','\u0943':'ri',
+  '\u0947':'e','\u0948':'ai','\u094B':'o','\u094C':'au','\u0902':'n','\u0901':'n','\u094D':'','\u0964':'.'
+};
+
+function transliterateForNonHindiVoice(text) {
+  if (!text) return "";
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const code = ch.charCodeAt(0);
+    if (code >= 0x0915 && code <= 0x0939) {
+      const next = text[i + 1];
+      const nextCode = next ? next.charCodeAt(0) : 0;
+      const isMatra = (nextCode >= 0x093E && nextCode <= 0x094C) || nextCode === 0x094D;
+      out += DEVA_MAP[ch] || ch;
+      if (!isMatra) {
+        out += "a";
+      }
+    } else {
+      out += DEVA_MAP[ch] !== undefined ? DEVA_MAP[ch] : ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * Split text into natural, crisp speaking sentences (punctuations preserved)
+ */
+function splitIntoSentences(text) {
+  if (!text || typeof text !== "string") return [];
+  const parts = text.match(/[^.!?।\n]+[.!?।\n]+|[^.!?।\n]+$/g) || [text];
+  return parts.map((s) => s.trim()).filter(Boolean);
+}
+
+let currentSpeechSession = 0;
+let keepAliveTimer = null;
+
+function clearKeepAlive() {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
+}
+
+function startKeepAlive() {
+  clearKeepAlive();
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    keepAliveTimer = setInterval(() => {
+      try {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      } catch {}
+    }, 6000);
+  }
+}
+
+/**
+ * Sequential high-definition Web Speech narrator with no cutoffs
+ */
+async function speakNativeWebSpeechSequence(text, options = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     if (options.onError) options.onError(new Error("Speech synthesis not supported"));
     return;
   }
 
-  try {
-    window.speechSynthesis.cancel();
-  } catch {}
+  stopSpeech();
+  const sessionId = ++currentSpeechSession;
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  window.__activeUtterance = utterance; // Prevent garbage collection in Chromium
+  const voices = await getReadyVoices();
+  const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
+  const voice = pickBestVoice(voices, options.lang || (isHindi ? "hi-IN" : "en-IN"), text);
 
-  const lang = options.lang || (text.match(/[\u0900-\u097F]/) ? "hi-IN" : "en-IN");
-  utterance.lang = lang;
-  utterance.rate = options.rate || 1.03; // Crisp, clear, natural conversational tempo
-  utterance.pitch = options.pitch || 1.0;
-  utterance.volume = 1.0; // Full volume clarity
+  const isNonHindiVoice = isHindi && voice &&
+    !(voice.lang || "").toLowerCase().startsWith("hi") &&
+    !(voice.name || "").toLowerCase().includes("hindi") &&
+    !(voice.name || "").includes("हिन्दी");
 
-  const voices = window.speechSynthesis.getVoices();
-  if (voices && voices.length > 0) {
-    let matchedVoice = null;
-    if (lang.startsWith("hi")) {
-      // Prioritize natural/neural human Hindi voices
-      matchedVoice = voices.find(v => (v.lang === "hi-IN" || v.lang.startsWith("hi")) && 
-        (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Swara") || v.name.includes("Madhur") || v.name.includes("Online"))) ||
-        voices.find(v => v.lang === "hi-IN" || v.lang.startsWith("hi"));
-    } else {
-      // Prioritize natural Indian English or warm neural English voices
-      matchedVoice = voices.find(v => (v.lang === "en-IN" || v.name.includes("India")) && 
-        (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Neerja") || v.name.includes("Prabhat") || v.name.includes("Online"))) ||
-        voices.find(v => v.lang === "en-IN" || v.name.includes("India")) ||
-        voices.find(v => (v.lang.startsWith("en-GB") || v.lang.startsWith("en-US")) && (v.name.includes("Natural") || v.name.includes("Google"))) ||
-        voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
-    }
-    if (matchedVoice) {
-      utterance.voice = matchedVoice;
-    }
+  const cleanText = isNonHindiVoice ? transliterateForNonHindiVoice(text) : text;
+  const sentences = splitIntoSentences(cleanText);
+
+  if (sentences.length === 0) {
+    if (options.onEnd) options.onEnd();
+    return;
   }
 
-  utterance.onstart = () => {
-    if (options.onStart) options.onStart();
-  };
-
-  utterance.onend = () => {
-    window.__activeUtterance = null;
-    if (options.onEnd) options.onEnd();
-  };
-
-  utterance.onerror = (err) => {
-    window.__activeUtterance = null;
-    console.warn("[WebSpeech] Synthesizer error:", err);
-    if (options.onError) options.onError(err);
-  };
-
-  // Chromium resume bug fix
-  setTimeout(() => {
-    try {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn("[WebSpeech] Speak failed:", e);
-      if (options.onError) options.onError(e);
-    }
-  }, 10);
-}
-
-/**
- * Sequential HD Audio Player
- */
-function playAudioQueue(chunks, langCode, options = {}) {
-  stopSpeech();
-  activeAudioQueue = [...chunks];
-  isPlayingQueue = true;
+  // Fast but normal fast, crisp conversational tempo (1.15x)
+  const rate = options.rate || 1.15;
+  const pitch = options.pitch || 1.0;
+  const volume = options.volume !== undefined ? options.volume : 1.0;
 
   if (options.onStart) options.onStart();
+  startKeepAlive();
 
-  function playNext() {
-    if (!isPlayingQueue || activeAudioQueue.length === 0) {
-      isPlayingQueue = false;
+  let sentenceIndex = 0;
+
+  function speakNext() {
+    if (sessionId !== currentSpeechSession) return;
+    if (sentenceIndex >= sentences.length) {
+      clearKeepAlive();
+      window.__activeUtterance = null;
       if (options.onEnd) options.onEnd();
       return;
     }
 
-    const chunk = activeAudioQueue.shift();
-    const url = `/api/tts?lang=${encodeURIComponent(langCode)}&text=${encodeURIComponent(chunk)}`;
-    const audio = new Audio(url);
-    activeAudioElement = audio;
-    audio.playbackRate = options.rate || 1.03;
-    audio.volume = 1.0; // High, crisp volume
+    const currentSentence = sentences[sentenceIndex++];
+    const utterance = new SpeechSynthesisUtterance(currentSentence);
+    window.__activeUtterance = utterance;
 
-    audio.onended = () => {
-      // Natural breath pause between sentences
-      setTimeout(() => {
-        playNext();
-      }, 60);
-    };
-
-    let hasHandledError = false;
-    const handleAudioFailure = (err) => {
-      if (hasHandledError) return;
-      hasHandledError = true;
-      console.warn("[VoiceStudio] Local audio endpoint fallback to Web Speech:", err);
-      isPlayingQueue = false;
-      speakNativeWebSpeech(chunk, options);
-    };
-
-    audio.onerror = handleAudioFailure;
-
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(handleAudioFailure);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang || (isHindi ? "hi-IN" : "en-IN");
+    } else {
+      utterance.lang = isHindi ? "hi-IN" : "en-IN";
     }
+
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = volume;
+
+    utterance.onend = () => {
+      if (sessionId !== currentSpeechSession) return;
+      setTimeout(speakNext, 35);
+    };
+
+    utterance.onerror = (err) => {
+      console.warn("[WebSpeech] Sentence warning:", err);
+      if (sessionId !== currentSpeechSession) return;
+      setTimeout(speakNext, 35);
+    };
+
+    setTimeout(() => {
+      if (sessionId !== currentSpeechSession) return;
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("[WebSpeech] Speak error:", err);
+        setTimeout(speakNext, 35);
+      }
+    }, 10);
   }
 
-  playNext();
+  speakNext();
 }
 
 /**
@@ -212,10 +336,11 @@ export async function speakText(text, options = {}) {
   stopSpeech();
 
   const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
-  const langCode = isHindi ? "hi" : "en";
+  const isLocalhost = typeof window !== "undefined" && 
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
-  // Check if VoiceStudio desktop service is active
-  if (isVoiceStudioAvailable) {
+  // On localhost only: Check if local VoiceStudio desktop service is active
+  if (isLocalhost && isVoiceStudioAvailable) {
     try {
       if (options.onStart) options.onStart();
       const res = await fetch(`${VOICE_STUDIO_HOST}/v1/audio/speech`, {
@@ -233,7 +358,7 @@ export async function speakText(text, options = {}) {
         const blob = await res.blob();
         const audioUrl = URL.createObjectURL(blob);
         activeAudioElement = new Audio(audioUrl);
-        activeAudioElement.playbackRate = options.rate || 1.0;
+        activeAudioElement.playbackRate = options.rate || 1.15;
         activeAudioElement.onended = () => {
           URL.revokeObjectURL(audioUrl);
           activeAudioElement = null;
@@ -242,8 +367,10 @@ export async function speakText(text, options = {}) {
         activeAudioElement.onerror = () => {
           URL.revokeObjectURL(audioUrl);
           activeAudioElement = null;
-          const chunks = splitTextIntoChunks(text, 150);
-          playAudioQueue(chunks, langCode, options);
+          speakNativeWebSpeechSequence(text, {
+            rate: 1.15,
+            ...options
+          });
         };
         await activeAudioElement.play();
         return;
@@ -253,26 +380,19 @@ export async function speakText(text, options = {}) {
     }
   }
 
-  // Primary Guaranteed HD Audio Engine (Crystal-clear human voice, works on Brave, Chrome, Safari, Firefox)
-  const chunks = splitTextIntoChunks(text, 150);
-  try {
-    playAudioQueue(chunks, langCode, {
-      ...options,
-      lang: isHindi ? "hi-IN" : "en-IN"
-    });
-  } catch (err) {
-    console.warn("[VoiceStudio] Audio queue init failed, using Web Speech:", err);
-    speakNativeWebSpeech(text, {
-      ...options,
-      lang: isHindi ? "hi-IN" : "en-IN"
-    });
-  }
+  // Instant high-definition sequence for GitHub Pages & modern browsers (Edge Swara/Madhur, Chrome Google Hindi)
+  return speakNativeWebSpeechSequence(text, {
+    rate: 1.15,
+    ...options
+  });
 }
 
 /**
  * Stop any running voice narration
  */
 export function stopSpeech() {
+  currentSpeechSession++;
+  clearKeepAlive();
   isPlayingQueue = false;
   activeAudioQueue = [];
   if (activeAudioElement) {
