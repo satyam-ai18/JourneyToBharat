@@ -9319,3 +9319,157 @@ button:active:not(:disabled),
   border: 1px solid rgba(212, 175, 55, 0.18);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE SYSTEM (Journey to Bharat)
+   ========================================================================== */
+
+/* Planner Grid Wrapper */
+.ty-nearby-wrapper {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 16px 20px;
+}
+
+@media (max-width: 768px) {
+  .ty-nearby-wrapper {
+    padding: 8px 10px;
+  }
+}
+
+/* Mobile Planner Tabs */
+.ty-mobile-planner-tabs {
+  display: none;
+  gap: 6px;
+  margin-bottom: 10px;
+  background: rgba(9, 23, 18, 0.95);
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 1023px) {
+  .ty-mobile-planner-tabs {
+    display: flex;
+  }
+}
+
+.ty-mobile-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ty-mobile-tab-btn.active {
+  background: linear-gradient(135deg, #d4af37 0%, #b45309 100%);
+  color: #091712;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+}
+
+/* Main Grid: Desktop 2-column, Mobile 1-column */
+.ty-nearby-grid-container {
+  display: grid;
+  grid-template-columns: minmax(380px, 460px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.ty-nearby-grid-container.fullscreen {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 1023px) {
+  .ty-nearby-grid-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ty-nearby-grid-container.mobile-tab-map .ty-nearby-sidebar {
+    display: none !important;
+  }
+
+  .ty-nearby-grid-container.mobile-tab-planner .ty-nearby-map-column {
+    display: none !important;
+  }
+
+  .ty-nearby-sidebar {
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* Map Height adjustments */
+@media (max-width: 1023px) {
+  .ty-nav-map-viewport {
+    height: 440px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ty-nav-map-viewport {
+    height: 380px !important;
+  }
+}
+
+/* YAVIKA Floating Voice Assistant Mobile Sheet */
+@media (max-width: 640px) {
+  .yavika-floating-container {
+    bottom: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .yavika-panel-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 80vh !important;
+    overflow-y: auto !important;
+    margin-bottom: 8px !important;
+    padding: 12px !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* Navbar mobile adjustments */
+@media (max-width: 640px) {
+  .ty-nav-container {
+    padding: 0 10px !important;
+    gap: 8px !important;
+  }
+  .ty-brand-subtitle {
+    display: none !important;
+  }
+  .ty-brand-title {
+    font-size: 15px !important;
+  }
+  .ty-nav-origin-strong {
+    max-width: 75px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .ty-origin-mode-badge {
+    display: none !important;
+  }
+  .ty-nav-actions {
+    gap: 6px !important;
+  }
+}

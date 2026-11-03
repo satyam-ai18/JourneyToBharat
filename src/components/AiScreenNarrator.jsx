@@ -623,6 +623,7 @@ export default function AiScreenNarrator({
 
   return (
     <div
+      className="yavika-floating-container"
       style={{
         position: "fixed",
         bottom: "20px",
@@ -635,6 +636,7 @@ export default function AiScreenNarrator({
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            className="yavika-panel-card"
             initial={{ opacity: 0, y: 14, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 14, scale: 0.94 }}

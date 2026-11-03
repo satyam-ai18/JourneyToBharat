@@ -342,6 +342,7 @@ export default function SmartNearbyExplorer({
   const [journeyRouteResult, setJourneyRouteResult] = useState(null);
   const [isCalculatingJourney, setIsCalculatingJourney] = useState(false);
   const [journeyOptimizeOrder, setJourneyOptimizeOrder] = useState(false);
+  const [mobilePlannerTab, setMobilePlannerTab] = useState("map"); // "map" | "planner"
 
   // Map controls
   const [showAllIndiaMarkers, setShowAllIndiaMarkers] = useState(false);
@@ -782,6 +783,12 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
       showToast("Please add at least one destination to plan.");
       return;
     }
+    setMobilePlannerTab("map");
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 180);
     triggerJourneyCalculation(selectedJourneyStops, journeyTravelMode, journeyOptimizeOrder);
   };
 
@@ -1509,20 +1516,41 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
       {/* =========================================================================
           MAIN SIDE-BY-SIDE SPLIT WORKSPACE: SIDEBAR (LEFT) & MAP (RIGHT)
           ========================================================================= */}
-      <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "16px 20px" }}>
+      <div className="ty-nearby-wrapper">
+        {/* Mobile View Toggle Tabs (Only visible on screens < 1024px) */}
+        <div className="ty-mobile-planner-tabs">
+          <button
+            type="button"
+            className={`ty-mobile-tab-btn ${mobilePlannerTab === "map" ? "active" : ""}`}
+            onClick={() => {
+              setMobilePlannerTab("map");
+              setTimeout(() => {
+                if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
+              }, 180);
+            }}
+          >
+            <Compass size={14} />
+            <span>🗺️ नक्शा देखें (Map View)</span>
+          </button>
+          <button
+            type="button"
+            className={`ty-mobile-tab-btn ${mobilePlannerTab === "planner" ? "active" : ""}`}
+            onClick={() => setMobilePlannerTab("planner")}
+          >
+            <RouteIcon size={14} />
+            <span>📋 रूट्स व स्थान ({selectedJourneyStops.length + 1})</span>
+          </button>
+        </div>
+
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isFullScreenMap ? "1fr" : "minmax(400px, 460px) 1fr",
-            gap: "20px",
-            alignItems: "start"
-          }}
+          className={`ty-nearby-grid-container ${isFullScreenMap ? "fullscreen" : ""} mobile-tab-${mobilePlannerTab}`}
         >
           {/* =====================================================================
               LEFT SIDEBAR: UNIVERSAL SEARCH & ITINERARY
               ===================================================================== */}
           {!isFullScreenMap && (
             <div
+              className="ty-nearby-sidebar"
               style={{
                 display: "flex",
                 flexDirection: "column",
@@ -1546,7 +1574,7 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
                 }}
               >
                 <span style={{ fontSize: "11px", fontWeight: "700", color: "#1c2e26" }}>Transit:</span>
-                <div style={{ display: "flex", gap: "4px" }}>
+                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                   {[
                     { id: "DRIVE", label: "Car Highway", icon: <Car size={13} /> },
                     { id: "TWO_WHEELER", label: "Motorcycle", icon: <Bike size={13} /> },
@@ -2756,7 +2784,7 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
           {/* =====================================================================
               RIGHT SIDE: LARGE INTERACTIVE MAP (720px Height)
               ===================================================================== */}
-          <div style={{ position: "relative" }}>
+          <div className="ty-nearby-map-column" style={{ position: "relative" }}>
             <div
               className="ty-nav-map-viewport"
               style={{
