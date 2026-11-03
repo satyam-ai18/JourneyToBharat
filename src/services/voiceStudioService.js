@@ -566,15 +566,18 @@ export async function startVoiceSearch({ onResult, onInterim, onError, onEnd, la
     };
 
     recognition.onresult = (event) => {
+      let final = "";
       let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += " " + event.results[i][0].transcript;
+      for (let i = 0; i < event.results.length; ++i) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          final += item[0].transcript + " ";
         } else {
-          interim += event.results[i][0].transcript;
+          interim += item[0].transcript;
         }
       }
-      liveLatestText = (finalTranscript + " " + interim).trim();
+      finalTranscript = final.trim();
+      liveLatestText = (final + interim).trim();
       if (onInterim && liveLatestText) {
         onInterim(liveLatestText);
       }

@@ -1307,57 +1307,52 @@ export default function AiScreenNarrator({
         )}
       </AnimatePresence>
 
-      {/* Floating Launcher Pill */}
-      <motion.button
-        type="button"
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={() => {
-          if (!isExpanded) {
+      {/* Floating Launcher Pill (Only shown when panel is collapsed) */}
+      {!isExpanded && (
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => {
             setIsExpanded(true);
             handlePlaySummary();
-          } else {
-            if (isSpeaking) {
-              handleStopSpeaking();
-            } else {
-              handlePlaySummary();
-            }
-          }
-        }}
-        style={{
-          background: isSpeaking
-            ? "linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)"
-            : "linear-gradient(135deg, #091712 0%, #173829 100%)",
-          color: "#fef3c7",
-          border: "1.5px solid var(--gold-primary, #d4af37)",
-          borderRadius: "50px",
-          padding: "10px 18px",
-          fontSize: "12px",
-          fontWeight: "800",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          cursor: "pointer",
-          boxShadow: isSpeaking
-            ? "0 4px 20px rgba(220, 38, 38, 0.5), 0 0 16px rgba(220, 38, 38, 0.4)"
-            : "0 4px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(212, 175, 55, 0.35)",
-          backdropFilter: "blur(12px)",
-          letterSpacing: "0.3px"
-        }}
-      >
-        {isSpeaking ? (
-          <>
-            <Square size={14} fill="#ffffff" />
-            <span>{language.startsWith("hi") ? "आवाज रोकें (Stop)" : "Stop Talking"}</span>
-          </>
-        ) : (
-          <>
-            <Headphones size={15} className="text-amber-400" />
-            <span>{language.startsWith("hi") ? "याविका (YAVIKA)" : "YAVIKA (AI Guide)"}</span>
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </>
-        )}
-      </motion.button>
+          }}
+          style={{
+            background: isSpeaking
+              ? "linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)"
+              : "linear-gradient(135deg, #091712 0%, #173829 100%)",
+            color: "#fef3c7",
+            border: "1.5px solid var(--gold-primary, #d4af37)",
+            borderRadius: "50px",
+            padding: "9px 16px",
+            fontSize: "12px",
+            fontWeight: "800",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            cursor: "pointer",
+            boxShadow: isSpeaking
+              ? "0 4px 20px rgba(220, 38, 38, 0.5), 0 0 16px rgba(220, 38, 38, 0.4)"
+              : "0 4px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(212, 175, 55, 0.35)",
+            backdropFilter: "blur(12px)",
+            letterSpacing: "0.3px",
+            flexShrink: 0
+          }}
+        >
+          {isSpeaking ? (
+            <>
+              <Square size={13} fill="#ffffff" />
+              <span>{language.startsWith("hi") ? "आवाज रोकें (Stop)" : "Stop Talking"}</span>
+            </>
+          ) : (
+            <>
+              <Headphones size={14} className="text-amber-400" />
+              <span>{language.startsWith("hi") ? "याविका (YAVIKA)" : "YAVIKA (AI Guide)"}</span>
+              <ChevronUp size={13} />
+            </>
+          )}
+        </motion.button>
+      )}
     </div>
   );
 }

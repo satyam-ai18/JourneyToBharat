@@ -2797,6 +2797,7 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
 
               {/* Floating Top Control Bar */}
               <div
+                className="ty-map-floating-top-bar"
                 style={{
                   position: "absolute",
                   top: "12px",
@@ -2812,6 +2813,7 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
               >
                 {/* Status Indicator */}
                 <div
+                  className="ty-map-status-pill"
                   style={{
                     background: "rgba(9, 23, 18, 0.9)",
                     backdropFilter: "blur(6px)",
@@ -2854,7 +2856,7 @@ Planned with Journey to Bharat — Smart Pilgrimage Navigator`;
                 </div>
 
                 {/* Baselayer & Fullscreen Controls */}
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", pointerEvents: "auto" }}>
+                <div className="ty-map-controls-group" style={{ display: "flex", alignItems: "center", gap: "6px", pointerEvents: "auto" }}>
                   <div
                     style={{
                       background: "rgba(9, 23, 18, 0.9)",

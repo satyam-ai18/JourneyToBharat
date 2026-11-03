@@ -305,6 +305,34 @@ export default function Navbar({
             <span className="ty-mobile-change-link">Change</span>
           </div>
 
+          {/* Mobile Language Selector Row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", margin: "6px 0", border: "1px solid rgba(212,175,55,0.2)" }}>
+            <span style={{ fontSize: "11px", color: "#94a3b8", display: "flex", alignItems: "center", gap: "5px" }}>
+              <Globe size={13} className="text-amber-400" /> Language:
+            </span>
+            <div style={{ display: "flex", gap: "4px" }}>
+              {languages.slice(0, 4).map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setCurrentLang(l.code)}
+                  style={{
+                    background: currentLang === l.code ? "rgba(212,175,55,0.3)" : "transparent",
+                    color: currentLang === l.code ? "#fef3c7" : "#cbd5e1",
+                    border: "1px solid " + (currentLang === l.code ? "#d4af37" : "rgba(255,255,255,0.1)"),
+                    borderRadius: "4px",
+                    padding: "2px 7px",
+                    fontSize: "10.5px",
+                    fontWeight: "700",
+                    cursor: "pointer"
+                  }}
+                >
+                  {l.code}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="ty-mobile-drawer-links">
             {navLinks.map((link) => {
               const isActive = activeView === link.id;
