@@ -50,10 +50,12 @@ let cachedVoices = [];
 
 function updateVoices() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
-    const list = window.speechSynthesis.getVoices();
-    if (list && list.length > 0) {
-      cachedVoices = list;
-    }
+    try {
+      const list = window.speechSynthesis.getVoices();
+      if (list && list.length > 0) {
+        cachedVoices = list;
+      }
+    } catch {}
   }
 }
 
@@ -62,38 +64,27 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
   if (window.speechSynthesis.onvoiceschanged !== undefined) {
     window.speechSynthesis.onvoiceschanged = updateVoices;
   }
+  window.speechSynthesis.addEventListener?.("voiceschanged", updateVoices);
+
+  // Global user activation audio unlocker: un-freezes synthesis engine on first click/touch
+  const unlockAudio = () => {
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+    } catch {}
+    window.removeEventListener("click", unlockAudio);
+    window.removeEventListener("touchstart", unlockAudio);
+  };
+  window.addEventListener("click", unlockAudio, { once: true, passive: true });
+  window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
 }
 
-async function getReadyVoices() {
+function getVoicesSynchronous() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return [];
   if (cachedVoices && cachedVoices.length > 0) return cachedVoices;
   updateVoices();
-  if (cachedVoices.length > 0) return cachedVoices;
-
-  return new Promise((resolve) => {
-    let done = false;
-    const timer = setTimeout(() => {
-      if (!done) {
-        done = true;
-        updateVoices();
-        resolve(cachedVoices);
-      }
-    }, 250);
-
-    const handler = () => {
-      if (!done) {
-        done = true;
-        clearTimeout(timer);
-        updateVoices();
-        resolve(cachedVoices);
-      }
-    };
-    try {
-      window.speechSynthesis.addEventListener("voiceschanged", handler, { once: true });
-    } catch {
-      window.speechSynthesis.onvoiceschanged = handler;
-    }
-  });
+  return cachedVoices || [];
 }
 
 /**
@@ -275,24 +266,25 @@ if (typeof window !== "undefined") {
 
 /**
  * Mobile-Safe & Desktop-Safe High-Definition Web Speech Narrator
- * Uses sequential clause chaining with watchdog timer to guarantee continuous full playback.
+ * Starts 100% synchronously under the user's click gesture (satisfying browser Autoplay Policies),
+ * then chains clauses sequentially so long sentences never cut off.
  */
-async function speakNativeWebSpeechSequence(text, options = {}) {
+function speakNativeWebSpeechSequence(text, options = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     if (options.onError) options.onError(new Error("Speech synthesis not supported"));
     return;
   }
 
-  stopSpeech();
+  // Cancel prior speech immediately
+  try {
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+    }
+  } catch {}
+
   const sessionId = ++currentSpeechSession;
 
-  // Tiny 50ms pause gives Chromium internal audio queue time to flush cancel()
-  await new Promise((r) => setTimeout(r, 50));
-  if (sessionId !== currentSpeechSession) return;
-
-  const voices = await getReadyVoices();
-  if (sessionId !== currentSpeechSession) return;
-
+  const voices = getVoicesSynchronous();
   const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
   const voice = pickBestVoice(voices, options.lang || (isHindi ? "hi-IN" : "en-IN"), text);
 
@@ -303,7 +295,7 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
 
   const cleanText = isNonHindiVoice ? transliterateForNonHindiVoice(text) : text;
 
-  // Split into short, natural clauses under 75 characters
+  // Split into short natural clause chunks under 75 characters
   const chunks = splitIntoSafeChunks(cleanText, 75);
 
   if (chunks.length === 0) {
@@ -317,75 +309,77 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
 
   if (options.onStart) options.onStart();
 
-  for (let i = 0; i < chunks.length; i++) {
-    if (sessionId !== currentSpeechSession) return;
-    const chunkText = chunks[i];
+  let index = 0;
 
-    await new Promise((resolve) => {
-      if (sessionId !== currentSpeechSession) {
-        resolve();
-        return;
+  function speakNextChunk() {
+    if (sessionId !== currentSpeechSession || index >= chunks.length) {
+      window.__activeUtterance = null;
+      if (sessionId === currentSpeechSession && options.onEnd) {
+        options.onEnd();
       }
+      return;
+    }
 
-      const utterance = new SpeechSynthesisUtterance(chunkText);
+    const chunkText = chunks[index];
+    const utterance = new SpeechSynthesisUtterance(chunkText);
 
-      // Retain in window & Set to prevent V8 garbage collection mid-speech
-      window.__activeUtterance = utterance;
+    // Retain in window & Set to prevent V8 garbage collection mid-speech
+    window.__activeUtterance = utterance;
+    if (typeof window !== "undefined" && window.__activeUtterancePool) {
+      window.__activeUtterancePool.add(utterance);
+    }
+
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang || (isHindi ? "hi-IN" : "en-IN");
+    } else {
+      utterance.lang = isHindi ? "hi-IN" : "en-IN";
+    }
+
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = volume;
+
+    let settled = false;
+    let watchdogTimer = null;
+
+    const finishChunk = () => {
+      if (settled) return;
+      settled = true;
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
       if (typeof window !== "undefined" && window.__activeUtterancePool) {
-        window.__activeUtterancePool.add(utterance);
+        window.__activeUtterancePool.delete(utterance);
       }
+      index++;
+      speakNextChunk();
+    };
 
-      if (voice) {
-        utterance.voice = voice;
-        utterance.lang = voice.lang || (isHindi ? "hi-IN" : "en-IN");
-      } else {
-        utterance.lang = isHindi ? "hi-IN" : "en-IN";
+    utterance.onend = finishChunk;
+    utterance.onerror = (err) => {
+      console.warn("[WebSpeech] Chunk event:", err?.error || err);
+      finishChunk();
+    };
+
+    // Watchdog fallback: If Android Chrome misses onend or audio stalls, auto-advance
+    const timeoutMs = Math.max(5000, Math.ceil(chunkText.length * 130));
+    watchdogTimer = setTimeout(finishChunk, timeoutMs);
+
+    try {
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
       }
-
-      utterance.rate = rate;
-      utterance.pitch = pitch;
-      utterance.volume = volume;
-
-      let settled = false;
-      let watchdogTimer = null;
-
-      const finishChunk = () => {
-        if (settled) return;
-        settled = true;
-        if (watchdogTimer) {
-          clearTimeout(watchdogTimer);
-          watchdogTimer = null;
-        }
-        if (typeof window !== "undefined" && window.__activeUtterancePool) {
-          window.__activeUtterancePool.delete(utterance);
-        }
-        resolve();
-      };
-
-      utterance.onend = finishChunk;
-      utterance.onerror = (err) => {
-        console.warn("[WebSpeech] Chunk event:", err?.error || err);
-        finishChunk();
-      };
-
-      // Watchdog fallback: If Android Chrome misses onend or audio stalls,
-      // force advance so the queue NEVER freezes!
-      const timeoutMs = Math.max(5000, Math.ceil(chunkText.length * 130));
-      watchdogTimer = setTimeout(finishChunk, timeoutMs);
-
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch (e) {
-        console.warn("[WebSpeech] speak failed:", e);
-        finishChunk();
-      }
-    });
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("[WebSpeech] speak failed:", e);
+      finishChunk();
+    }
   }
 
-  if (sessionId === currentSpeechSession) {
-    window.__activeUtterance = null;
-    if (options.onEnd) options.onEnd();
-  }
+  // Execute first chunk synchronously in the direct click gesture!
+  speakNextChunk();
 }
 
 /**
@@ -394,7 +388,7 @@ async function speakNativeWebSpeechSequence(text, options = {}) {
  * @param {string} text - Text to speak
  * @param {object} options - { onStart, onEnd, onError, rate, pitch, voiceName, lang }
  */
-export async function speakText(text, options = {}) {
+export function speakText(text, options = {}) {
   if (!text || typeof text !== "string") return;
   stopSpeech();
 
@@ -406,7 +400,7 @@ export async function speakText(text, options = {}) {
   if (isLocalhost && isVoiceStudioAvailable) {
     try {
       if (options.onStart) options.onStart();
-      const res = await fetch(`${VOICE_STUDIO_HOST}/v1/audio/speech`, {
+      fetch(`${VOICE_STUDIO_HOST}/v1/audio/speech`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -415,29 +409,33 @@ export async function speakText(text, options = {}) {
           input: text,
           response_format: "mp3"
         })
+      }).then(async (res) => {
+        if (res.ok) {
+          const blob = await res.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          activeAudioElement = new Audio(audioUrl);
+          activeAudioElement.playbackRate = options.rate || 1.15;
+          activeAudioElement.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            activeAudioElement = null;
+            if (options.onEnd) options.onEnd();
+          };
+          activeAudioElement.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            activeAudioElement = null;
+            speakNativeWebSpeechSequence(text, {
+              rate: 1.15,
+              ...options
+            });
+          };
+          await activeAudioElement.play();
+        } else {
+          speakNativeWebSpeechSequence(text, { rate: 1.15, ...options });
+        }
+      }).catch(() => {
+        speakNativeWebSpeechSequence(text, { rate: 1.15, ...options });
       });
-
-      if (res.ok) {
-        const blob = await res.blob();
-        const audioUrl = URL.createObjectURL(blob);
-        activeAudioElement = new Audio(audioUrl);
-        activeAudioElement.playbackRate = options.rate || 1.15;
-        activeAudioElement.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          activeAudioElement = null;
-          if (options.onEnd) options.onEnd();
-        };
-        activeAudioElement.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          activeAudioElement = null;
-          speakNativeWebSpeechSequence(text, {
-            rate: 1.15,
-            ...options
-          });
-        };
-        await activeAudioElement.play();
-        return;
-      }
+      return;
     } catch {
       // Fallback
     }
