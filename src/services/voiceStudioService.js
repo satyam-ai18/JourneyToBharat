@@ -383,8 +383,73 @@ function speakNativeWebSpeechSequence(text, options = {}) {
 }
 
 /**
+ * Play speech using HD Google Audio Stream (no-referrer),
+ * with automatic fallback to Web Speech API.
+ * This guarantees crystal-clear natural Hindi/English audio across all browsers,
+ * including Windows Chrome (where no Hindi voice is installed in the OS).
+ */
+function playHdAudioStreamSequence(text, chunks, options = {}) {
+  const sessionId = ++currentSpeechSession;
+  if (options.onStart) options.onStart();
+
+  const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
+  const targetLang = isHindi ? "hi" : "en";
+  const isLocalhost = typeof window !== "undefined" && 
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  let index = 0;
+
+  function playNextChunk() {
+    if (sessionId !== currentSpeechSession || index >= chunks.length) {
+      activeAudioElement = null;
+      if (sessionId === currentSpeechSession && options.onEnd) {
+        options.onEnd();
+      }
+      return;
+    }
+
+    const chunk = chunks[index];
+    const encoded = encodeURIComponent(chunk);
+    const audioUrl = isLocalhost
+      ? `/api/tts?lang=${targetLang}&text=${encoded}`
+      : `https://translate.google.com/translate_tts?ie=UTF-8&tl=${targetLang}&client=tw-ob&q=${encoded}`;
+
+    const audio = new Audio();
+    audio.referrerPolicy = "no-referrer";
+    audio.src = audioUrl;
+    audio.playbackRate = options.rate || 1.15;
+    activeAudioElement = audio;
+
+    let finished = false;
+    const advance = () => {
+      if (finished) return;
+      finished = true;
+      index++;
+      playNextChunk();
+    };
+
+    audio.onended = advance;
+    audio.onerror = (e) => {
+      console.warn("[HDAudio] Audio stream error, falling back to Web Speech:", e);
+      speakNativeWebSpeechSequence(chunks.slice(index).join(" "), options);
+    };
+
+    // Synchronous playback under the user click gesture
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn("[HDAudio] play() blocked, falling back to Web Speech:", err);
+        speakNativeWebSpeechSequence(chunks.slice(index).join(" "), options);
+      });
+    }
+  }
+
+  playNextChunk();
+}
+
+/**
  * Master Speech Dispatcher:
- * Tries VoiceStudio -> Guaranteed HD Human Audio Stream -> Web Speech API
+ * Tries Guaranteed HD Human Audio Stream -> Web Speech API fallback
  * @param {string} text - Text to speak
  * @param {object} options - { onStart, onEnd, onError, rate, pitch, voiceName, lang }
  */
@@ -392,60 +457,19 @@ export function speakText(text, options = {}) {
   if (!text || typeof text !== "string") return;
   stopSpeech();
 
-  const isHindi = (options.lang && options.lang.startsWith("hi")) || /[\u0900-\u097F]/.test(text);
-  const isLocalhost = typeof window !== "undefined" && 
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-
-  // On localhost only: Check if local VoiceStudio desktop service is active
-  if (isLocalhost && isVoiceStudioAvailable) {
-    try {
-      if (options.onStart) options.onStart();
-      fetch(`${VOICE_STUDIO_HOST}/v1/audio/speech`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "tts-1",
-          voice: options.voiceName || (isHindi ? "alloy" : "nova"),
-          input: text,
-          response_format: "mp3"
-        })
-      }).then(async (res) => {
-        if (res.ok) {
-          const blob = await res.blob();
-          const audioUrl = URL.createObjectURL(blob);
-          activeAudioElement = new Audio(audioUrl);
-          activeAudioElement.playbackRate = options.rate || 1.15;
-          activeAudioElement.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            activeAudioElement = null;
-            if (options.onEnd) options.onEnd();
-          };
-          activeAudioElement.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            activeAudioElement = null;
-            speakNativeWebSpeechSequence(text, {
-              rate: 1.15,
-              ...options
-            });
-          };
-          await activeAudioElement.play();
-        } else {
-          speakNativeWebSpeechSequence(text, { rate: 1.15, ...options });
-        }
-      }).catch(() => {
-        speakNativeWebSpeechSequence(text, { rate: 1.15, ...options });
-      });
-      return;
-    } catch {
-      // Fallback
-    }
+  const chunks = splitIntoSafeChunks(text, 80);
+  if (chunks.length === 0) {
+    if (options.onEnd) options.onEnd();
+    return;
   }
 
-  // Instant high-definition sequence for GitHub Pages & modern browsers (Edge Swara/Madhur, Chrome Google Hindi)
-  return speakNativeWebSpeechSequence(text, {
-    rate: 1.15,
-    ...options
-  });
+  // Primary: High-Definition Natural Audio Stream (universal support, works everywhere)
+  try {
+    playHdAudioStreamSequence(text, chunks, options);
+  } catch (err) {
+    console.warn("[Speech] HD stream init failed, using Web Speech:", err);
+    speakNativeWebSpeechSequence(text, options);
+  }
 }
 
 /**
@@ -467,7 +491,9 @@ export function stopSpeech() {
   }
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     try {
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
     } catch {}
     window.__activeUtterance = null;
   }

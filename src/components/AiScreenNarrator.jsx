@@ -322,7 +322,9 @@ export default function AiScreenNarrator({
   // Unified speech executor
   const executeSpeech = (text, topic = "summary") => {
     if (!text) return;
-    stopSpeech();
+    if (isSpeaking) {
+      stopSpeech();
+    }
     setIsPaused(false);
     setActiveTopic(topic);
     setActiveSpokenText(text);
